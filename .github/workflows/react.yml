@@ -6,9 +6,9 @@ name: Build and Deploy Apps
 # events but only for the main branch
 on:
   push:
-    branches: [main]
+    branches: [ react ]
   pull_request:
-    branches: [main]
+    branches: [ react ]
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -54,59 +54,39 @@ jobs:
           name: xit-package
           path: .dist
 
-  release:
+  deploy:
     name: Create Release
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+      - uses: actions/checkout@v2
+
+      - name: Install jq hub
+        run: sudo apt install jq -y
+
+      - uses: actions/download-artifact@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Changes in this Release
-            - First Change
-            - Second Change
-          draft: false
-          prerelease: false
+          name: xit-package
+          path: ./
 
-  # deploy:
-  #   name: Create Release
-  #   needs: [build]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v2
+      - name: Set version
+        run: |
+          ver=$(cat ./release_notes.json | jq ".[-1].version" | tr -d '"')
+          echo "::set-output name=VERSION::$ver"
+          echo $ver
+        id: deploy_info
 
-  #     - name: Install jq hub
-  #       run: sudo apt install jq -y
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+        run: |
+          export GITHUB_REPOSITORY=howzitcal/xitool.ml_serve
+          tag_name=$(cat ./release_notes.json | jq ".[-1].version" | tr -d '"')
+          asset_dir="./"
+          assets=()
+          for f in "$asset_dir"/*; do [ -f "$f" ] && assets+=(-a "$f"); done
+          hub release create "${assets[@]}" -m "$tag_name" "$tag_name"
 
-  #     - uses: actions/download-artifact@v2
-  #       with:
-  #         name: xit-package
-  #         path: ./
-
-  #     - name: Set version
-  #       run: |
-  #         ver=$(cat ./release_notes.json | jq ".[-1].version" | tr -d '"')
-  #         echo "::set-output name=VERSION::$ver"
-  #         echo $ver
-  #       id: deploy_info
-
-  #     - name: Create Release
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.PAT }}
-  #       run: |
-  #         export GITHUB_REPOSITORY=howzitcal/xitool.ml_serve
-  #         tag_name=$(cat ./release_notes.json | jq ".[-1].version" | tr -d '"')
-  #         asset_dir="./"
-  #         assets=()
-  #         for f in "$asset_dir"/*; do [ -f "$f" ] && assets+=(-a "$f"); done
-  #         hub release create "${assets[@]}" -m "$tag_name" "$tag_name"
 #      - name: Create Release
 #        id: create_release
 #        uses: actions/create-release@v1
