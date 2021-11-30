@@ -2,6 +2,8 @@ from os import system, remove
 from platform import architecture
 from shutil import rmtree
 
+# test
+
 from PIL import (
     Image,
     ImageFont,
